@@ -95,7 +95,8 @@ st.markdown("Upload logos or use preloaded ones below:")
 
 uploaded_files = st.file_uploader("Upload logos", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
 preloaded = load_preloaded_logos()
-selected_preloaded = st.multiselect("Select preloaded logos", options=list(preloaded.keys()))
+preloaded = load_preloaded_logos()
+selected_preloaded = st.multiselect("Select preloaded logos", options=sorted(preloaded.keys(), key=lambda x: x.lower()))
 
 canvas_width_in = st.number_input("Grid width (inches)", min_value=1.0, max_value=20.0, value=10.0)
 canvas_height_in = st.number_input("Grid height (inches)", min_value=1.0, max_value=20.0, value=7.5)

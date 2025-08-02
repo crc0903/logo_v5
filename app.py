@@ -1,6 +1,5 @@
-
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageChops
 import os
 import io
 import math
@@ -20,11 +19,42 @@ def load_preloaded_logos():
             logos[name] = image
     return logos
 
-def resize_to_fit(image, target_width, target_height):
+# Trim white or transparent space around the logo
+def trim_whitespace(image):
+    bg = Image.new(image.mode, image.size, (255, 255, 255, 0))  # transparent background
+    diff = ImageChops.difference(image, bg)
+    bbox = diff.getbbox()
+    if bbox:
+        return image.crop(bbox)
+    return image
+
+# Resize logo to fill a dynamic 5x2 box inside the cell (whichever is limiting)
+def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.9):
+    box_ratio = 5 / 2
+    max_box_width = int(cell_width_px * buffer_ratio)
+    max_box_height = int(cell_height_px * buffer_ratio)
+
+    # Fit the largest possible 5x2 box inside the cell
+    if max_box_width / box_ratio <= max_box_height:
+        box_width = max_box_width
+        box_height = int(max_box_width / box_ratio)
+    else:
+        box_height = max_box_height
+        box_width = int(max_box_height * box_ratio)
+
+    # Resize logo proportionally to fit within that box
     img_w, img_h = image.size
-    ratio = min(target_width / img_w, target_height / img_h)
-    new_size = (int(img_w * ratio), int(img_h * ratio))
-    return image.resize(new_size, Image.LANCZOS)
+    img_ratio = img_w / img_h
+
+    if img_ratio > (box_width / box_height):
+        new_width = box_width
+        new_height = int(box_width / img_ratio)
+    else:
+        new_height = box_height
+        new_width = int(box_height * img_ratio)
+
+    resized = image.resize((new_width, new_height), Image.LANCZOS)
+    return resized, box_width, box_height
 
 def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_row):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -44,16 +74,27 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     for idx, logo in enumerate(logos):
         col = idx % cols
         row = idx // cols
-        resized = resize_to_fit(logo, cell_width, cell_height)
+
+        trimmed = trim_whitespace(logo)
+        resized, box_width, box_height = resize_to_fill_5x2_box(trimmed, int(cell_width), int(cell_height))
 
         img_stream = io.BytesIO()
         resized.save(img_stream, format="PNG")
         img_stream.seek(0)
 
-        left = left_margin + Inches(col * (canvas_width_in / cols))
-        top = top_margin + Inches(row * (canvas_height_in / rows))
-        slide.shapes.add_picture(img_stream, left, top, width=Inches(resized.width / 96), height=Inches(resized.height / 96))
+        # Center the logo inside the 5x2 box, and box inside the cell
+        x_offset = (cell_width - box_width) / 2 + (box_width - resized.width) / 2
+        y_offset = (cell_height - box_height) / 2 + (box_height - resized.height) / 2
+        left = left_margin + Inches((col * cell_width + x_offset) / 96)
+        top = top_margin + Inches((row * cell_height + y_offset) / 96)
 
+        slide.shapes.add_picture(
+            img_stream, left, top,
+            width=Inches(resized.width / 96),
+            height=Inches(resized.height / 96)
+        )
+
+# --- Streamlit UI ---
 st.title("Logo Grid PowerPoint Exporter")
 st.markdown("Upload logos or use preloaded ones below:")
 
@@ -73,14 +114,15 @@ if st.button("Generate PowerPoint"):
             image = Image.open(f).convert("RGBA")
             images.append(image)
 
-    for name in selected_preloaded:
+    for name in sorted(selected_preloaded):
         images.append(preloaded[name])
 
     if not images:
         st.warning("Please upload or select logos.")
     else:
         prs = Presentation()
-        create_logo_slide(prs, images, canvas_width_in, canvas_height_in, logos_per_row if logos_per_row > 0 else None)
+        create_logo_slide(prs, images, canvas_width_in, canvas_height_in,
+                          logos_per_row if logos_per_row > 0 else None)
 
         output = io.BytesIO()
         prs.save(output)

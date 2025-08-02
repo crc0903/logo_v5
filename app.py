@@ -58,7 +58,7 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     canvas_height_px = int(canvas_height_in * 96)
 
     logo_count = len(logos)
-    cols = logos_per_row if logos_per_row else max(1, round(math.sqrt(logo_count * canvas_width_in / canvas_height_in)))
+    cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
 
     cell_width = canvas_width_px / cols

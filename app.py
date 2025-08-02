@@ -19,7 +19,6 @@ def load_preloaded_logos():
             logos[name] = image
     return logos
 
-# Trim white or transparent space around the logo
 def trim_whitespace(image):
     bg = Image.new(image.mode, image.size, (255, 255, 255, 0))  # transparent background
     diff = ImageChops.difference(image, bg)
@@ -28,13 +27,11 @@ def trim_whitespace(image):
         return image.crop(bbox)
     return image
 
-# Resize logo to fill a dynamic 5x2 box inside the cell (whichever is limiting)
 def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.9):
     box_ratio = 5 / 2
     max_box_width = int(cell_width_px * buffer_ratio)
     max_box_height = int(cell_height_px * buffer_ratio)
 
-    # Fit the largest possible 5x2 box inside the cell
     if max_box_width / box_ratio <= max_box_height:
         box_width = max_box_width
         box_height = int(max_box_width / box_ratio)
@@ -42,7 +39,6 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         box_height = max_box_height
         box_width = int(max_box_height * box_ratio)
 
-    # Resize logo proportionally to fit within that box
     img_w, img_h = image.size
     img_ratio = img_w / img_h
 
@@ -82,7 +78,6 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
         resized.save(img_stream, format="PNG")
         img_stream.seek(0)
 
-        # Center the logo inside the 5x2 box, and box inside the cell
         x_offset = (cell_width - box_width) / 2 + (box_width - resized.width) / 2
         y_offset = (cell_height - box_height) / 2 + (box_height - resized.height) / 2
         left = left_margin + Inches((col * cell_width + x_offset) / 96)
@@ -107,19 +102,27 @@ canvas_height_in = st.number_input("Grid height (inches)", min_value=1.0, max_va
 logos_per_row = st.number_input("Logos per row (optional)", min_value=0, max_value=50, value=0)
 
 if st.button("Generate PowerPoint"):
-    images = []
+    logo_entries = []
 
+    # Uploaded logos
     if uploaded_files:
         for f in uploaded_files:
+            name = os.path.splitext(f.name)[0]
             image = Image.open(f).convert("RGBA")
-            images.append(image)
+            logo_entries.append((name.lower(), image))
 
-    for name in sorted(selected_preloaded):
-        images.append(preloaded[name])
+    # Preloaded logos
+    for name in selected_preloaded:
+        image = preloaded[name]
+        logo_entries.append((name.lower(), image))
 
-    if not images:
+    if not logo_entries:
         st.warning("Please upload or select logos.")
     else:
+        # Sort alphabetically
+        logo_entries.sort(key=lambda x: x[0])
+        images = [entry[1] for entry in logo_entries]
+
         prs = Presentation()
         create_logo_slide(prs, images, canvas_width_in, canvas_height_in,
                           logos_per_row if logos_per_row > 0 else None)

@@ -27,7 +27,7 @@ def trim_whitespace(image):
         return image.crop(bbox)
     return image
 
-def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.8):
+def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.7):
     box_ratio = 3 / 1
     max_box_width = int(cell_width_px * buffer_ratio)
     max_box_height = int(cell_height_px * buffer_ratio)
